@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-A module that implements an expiring web cache and request tracker using Redis.
+Implements an expiring web cache and access counter using Redis.
 """
 
 import redis
@@ -8,35 +8,37 @@ import requests
 from functools import wraps
 from typing import Callable
 
-# Initialize Redis client
+# Connect to Redis (default localhost:6379)
 redis_store = redis.Redis()
 
-def data_cacher(method: Callable[[str], str]) -> Callable[[str], str]:
+def count_and_cache(method: Callable[[str], str]) -> Callable[[str], str]:
     """
-    Decorator to cache page responses and track access count.
+    Decorator to:
+    - Increment access counter for the given URL (key: count:{url})
+    - Cache the result in Redis for 10 seconds (key: result:{url})
     """
     @wraps(method)
     def wrapper(url: str) -> str:
-        # Track how many times this URL is accessed
+        # Track number of times URL is accessed
         redis_store.incr(f"count:{url}")
 
-        # Try to get cached result
+        # Return cached result if available
         cached_result = redis_store.get(f"result:{url}")
         if cached_result:
             return cached_result.decode('utf-8')
 
-        # If not cached, fetch result and cache it for 10 seconds
+        # Fetch, cache result with TTL=10 seconds
         result = method(url)
         redis_store.setex(f"result:{url}", 10, result)
         return result
 
     return wrapper
 
-@data_cacher
+@count_and_cache
 def get_page(url: str) -> str:
     """
-    Fetches and returns the content of a URL.
-    Caching and tracking are handled by the data_cacher decorator.
+    Fetches HTML content of the given URL using requests,
+    with caching and access count tracking.
     """
     response = requests.get(url)
     return response.text
