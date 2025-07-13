@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
-Module that implements request caching and tracking using Redis.
-
-This module defines a get_page function that fetches the content of a
-web page and caches it for 10 seconds. It also tracks how many times
-each URL has been accessed using a Redis counter.
+This module provides a function to retrieve web pages with caching
+and access counting using Redis. The page content is cached for a
+limited time to improve efficiency and performance.
 """
 
 import redis
@@ -14,31 +12,31 @@ from typing import Callable
 
 redis_store = redis.Redis()
 """
-Redis client instance for caching and counting URL accesses.
+The Redis client instance used to store cached page content and count accesses.
 """
 
 
 def count_and_cache(method: Callable[[str], str]) -> Callable[[str], str]:
     """
-    Decorator that tracks the number of times a URL is accessed
-    and caches the response for 10 seconds.
+    Decorator that counts how many times a URL has been accessed
+    and caches the web page response for 10 seconds.
 
     Args:
-        method: The function to wrap.
+        method: The function used to retrieve the web page content.
 
     Returns:
-        The wrapped function.
+        A decorated function that counts accesses and caches the result.
     """
     @wraps(method)
     def wrapper(url: str) -> str:
         """
-        Wrapper function that applies counting and caching.
+        Wrapper function that implements the counting and caching logic.
 
         Args:
-            url: The URL to fetch.
+            url: The URL to retrieve content from.
 
         Returns:
-            The content of the URL, cached if available.
+            The HTML content of the URL as a string. Cached if previously requested.
         """
         redis_store.incr(f"count:{url}")
         cached_result = redis_store.get(f"result:{url}")
@@ -54,15 +52,16 @@ def count_and_cache(method: Callable[[str], str]) -> Callable[[str], str]:
 @count_and_cache
 def get_page(url: str) -> str:
     """
-    Fetches and returns the HTML content of the given URL.
+    Fetches the content of a web page using the requests module.
 
-    Uses the requests module to get the web page content.
+    This function is decorated to count how many times the URL was requested
+    and cache the result for 10 seconds using Redis.
 
     Args:
-        url: The URL to fetch.
+        url: The URL of the web page to fetch.
 
     Returns:
-        The content of the URL as a string.
+        The content of the web page as a string.
     """
     response = requests.get(url)
     return response.text
